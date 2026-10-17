@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 编译产物
+*.o
+*.elf
+*.bin
+*.map
+
+# 模型权重
+*.pt
+*.onnx
+*.engine
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
