@@ -29,6 +29,8 @@ SENSOR_ID = 0
 DEFAULT_W = 1920
 DEFAULT_H = 1080
 DEFAULT_FPS = 30
+DEFAULT_STREAM_FPS = 60      # 连续取帧默认 60fps（IMX219 720p 支持 59.999fps）
+EXPOSURE_MAX_NS = 8000000    # 流式取帧时曝光上限 8ms：60fps 下自动曝光不能拉满一帧
 PREHEAT_FRAMES = 90          # 预热帧数：自动曝光/白平衡需要这么多帧才收敛
 
 GST = "gst-launch-1.0"
@@ -104,8 +106,12 @@ def video(path, seconds=5, width=DEFAULT_W, height=DEFAULT_H, fps=DEFAULT_FPS,
 
 
 # ---------------------------------------------------------------- 连续取帧
-def frames(width=DEFAULT_W, height=DEFAULT_H, fps=DEFAULT_FPS):
+def frames(width=DEFAULT_W, height=DEFAULT_H, fps=DEFAULT_STREAM_FPS,
+           exposure_max_ns=EXPOSURE_MAX_NS):
     """生成器：连续产出 BGR 帧（给目标检测用）。
+
+    默认 60fps + 曝光上限 8ms + max-buffers=1：
+    取帧等待从 33ms 降到 16.7ms，且拿到的永远是最新帧（不排队）。
 
     用法：
         for f in frames():
@@ -114,11 +120,12 @@ def frames(width=DEFAULT_W, height=DEFAULT_H, fps=DEFAULT_FPS):
     import cv2
     _check_device()
     pipeline = (
-        "nvarguscamerasrc sensor-id=" + str(SENSOR_ID) +
+        "nvarguscamerasrc sensor-id=" + str(SENSOR_ID) + " aeantibanding=2"
+        ' exposuretimerange="1000 ' + str(int(exposure_max_ns)) + '" gainrange="1 16"'
         ' ! video/x-raw(memory:NVMM),width=' + str(width) + ",height=" + str(height) +
         ",framerate=" + str(fps) + '/1,format=NV12"'
         " ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert"
-        " ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=2"
+        " ! video/x-raw,format=BGR ! appsink drop=1 max-buffers=1 sync=false"
     )
     cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
     if not cap.isOpened():
